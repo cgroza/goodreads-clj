@@ -1,8 +1,9 @@
 (ns goodreads
-  (:require [clj-http.client :as http])
-  (:require [clojure.string :as string])
-  (:require [clojure.xml :as xml])
-  (:require [clojure.data.json :as json])
+  (:require [clj-http.client :as http]
+            [clojure.string :as string]
+            [clojure.xml :as xml]
+            [clojure.data.json :as json]
+            [oauth.client :as oauth])
   (:import [java.net URLEncoder]))
 
 ;; Developers authentication
@@ -31,28 +32,29 @@
 (def url-series "/series/show/")
 (def url-series-author "/series/list")
 (def url-series-work "/work/")
+
+(def url-request-token  (format "%s/oauth/request_token/" root-url))
+(def url-authorize  (format "%s/oauth/authorize/" root-url))
+(def url-access-token (format "%s/oauth/access_token/" root-url))
+
 ;; Default parameters
 (def default-data {"key" dev-key})
 
 (defn parametric [data]
-  (string/join "&" (map (fn [[k v]] (str k "=" v)) data)))
+  (string/join "&" (map (fn [[k v]] (str k "=" (. URLEncoder encode v))) data)))
 
 (defn url-get
-  ([api-url] (url-get api-url {}))
+  ([api-url] (url-get api-url) {})
   ([api-url data]
    (http/get (str root-url api-url "?" (parametric (conj default-data data))))))
-
 
 (defn parse-xml-body [response]
   (->> response :body .getBytes java.io.ByteArrayInputStream. xml/parse))
 
 (def url-get-parsed (comp parse-xml-body url-get))
 
-(defn encode-name [name]
-  (string/replace name #"\s+" "+"))
-
 (defn id-author-name [author]
-  (url-get-parsed (str url-author-id-name "/" (encode-name author)) {}))
+  (url-get-parsed (str url-author-id-name "/" author) {}))
 
 (defn id-of-isbns [isbns]
   (->
@@ -70,7 +72,7 @@
 
 
 (defn reviews-widget-title [title author & rating]
-  (let [data {"title" title "author" (encode-name author)}]
+  (let [data {"title" title "author" author}]
     (if (not-empty rating) (assoc data "rating" (str (first rating))) data))
   (url-get-parsed url-review-title))
 
@@ -89,7 +91,7 @@
 (defn find-group
   ([name] (find-group name 1))
   ([name page]
-   (url-get-parsed url-find-group {"q" (encode-name name) "page" (str page)})))
+   (url-get-parsed url-find-group {"q" name "page" (str page)})))
 
 (defn info-group-id [id sort order ]
   ;; sort: Field to sort topics by. One of 'comments_count', 'title', 'updated_at', 'views'
@@ -128,7 +130,7 @@
   ([query-string page] (find-book query-string page "all"))
   ([query-string page field]
    (url-get-parsed url-find-book
-                   {"q" (encode-name query-string)
+                   {"q" query-string
                     "page" (str page)
                     "field" field})))
 
