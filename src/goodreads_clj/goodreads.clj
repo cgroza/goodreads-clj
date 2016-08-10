@@ -2,6 +2,7 @@
   (:require [clj-http.client :as http]
             [clojure.string :as string]
             [clojure.xml :as xml]
+            [clojure.zip :as zip]
             [clojure.data.json :as json]
             [oauth.client :as oauth])
   (:import [java.net URLEncoder]))
@@ -41,15 +42,23 @@
 (def default-data {"key" dev-key})
 
 (defn parametric [data]
+  "Formats parameters into URLs."
   (string/join "&" (map (fn [[k v]] (str k "=" (. URLEncoder encode v))) data)))
 
 (defn url-get
+  "Retrieves the xml response from api-url"
   ([api-url] (url-get api-url) {})
   ([api-url data]
    (http/get (str root-url api-url "?" (parametric (conj default-data data))))))
 
 (defn parse-xml-body [response]
-  (->> response :body .getBytes java.io.ByteArrayInputStream. xml/parse))
+  "Returns zipped xml response."
+  (->> response
+       :body
+       .getBytes
+       java.io.ByteArrayInputStream.
+       xml/parse
+       zip/xml-zip))
 
 (def url-get-parsed (comp parse-xml-body url-get))
 
@@ -69,7 +78,6 @@
   ([id] (author-books-page id 1))
   ([id page]
    (url-get-parsed url-author-books-page {"id" id "page" (str page)})))
-
 
 (defn reviews-widget-title [title author & rating]
   (let [data {"title" title "author" author}]
@@ -93,7 +101,7 @@
   ([name page]
    (url-get-parsed url-find-group {"q" name "page" (str page)})))
 
-(defn info-group-id [id sort order ]
+(defn info-group-id [id sort order]
   ;; sort: Field to sort topics by. One of 'comments_count', 'title', 'updated_at', 'views'
   ;; order: 'a' for ascending, 'd' for descending
   (url-get-parsed (str url-info-group-id id ".xml") {"sort" sort "order" order}))
